@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, FlatList } from 'react-native';
 import { Post } from '@/types/post';
 import { colors } from '@/styles/commonStyles';
 import { IconSymbol } from './IconSymbol';
@@ -62,9 +62,46 @@ export const PostCard: React.FC<PostCardProps> = ({
           )}
         </View>
 
-        <Text style={styles.content} numberOfLines={3}>
-          {post.content}
-        </Text>
+        {post.content && (
+          <Text style={styles.content} numberOfLines={3}>
+            {post.content}
+          </Text>
+        )}
+
+        {post.imageUris && post.imageUris.length > 0 && (
+          <View style={styles.mediaContainer}>
+            <FlatList
+              data={post.imageUris}
+              renderItem={({ item }) => (
+                <Image
+                  source={{ uri: item }}
+                  style={styles.mediaThumbnail}
+                />
+              )}
+              keyExtractor={(_, index) => `image-${index}`}
+              scrollEnabled={false}
+              numColumns={3}
+              columnWrapperStyle={styles.mediaGrid}
+            />
+          </View>
+        )}
+
+        {post.videoUris && post.videoUris.length > 0 && (
+          <View style={styles.mediaContainer}>
+            <FlatList
+              data={post.videoUris}
+              renderItem={() => (
+                <View style={styles.videoThumbnail}>
+                  <IconSymbol name="play.circle.fill" color={colors.primary} size={32} />
+                </View>
+              )}
+              keyExtractor={(_, index) => `video-${index}`}
+              scrollEnabled={false}
+              numColumns={3}
+              columnWrapperStyle={styles.mediaGrid}
+            />
+          </View>
+        )}
 
         {showApprovalStatus && post.requestedApprovals.length > 0 && (
           <View style={styles.approvalInfo}>
@@ -141,6 +178,27 @@ const styles = StyleSheet.create({
     color: colors.text,
     lineHeight: 24,
     marginBottom: 12,
+  },
+  mediaContainer: {
+    marginBottom: 12,
+  },
+  mediaGrid: {
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  mediaThumbnail: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+  },
+  videoThumbnail: {
+    width: '31%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   approvalInfo: {
     marginBottom: 12,

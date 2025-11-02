@@ -25,6 +25,8 @@ export const usePostsStore = () => {
           updatedAt: new Date(post.updatedAt),
           requestedApprovals: post.requestedApprovals || [],
           approvals: post.approvals || {},
+          imageUris: post.imageUris || [],
+          videoUris: post.videoUris || [],
         }));
         setPosts(parsedPosts);
       }
@@ -44,7 +46,12 @@ export const usePostsStore = () => {
     }
   }, []);
 
-  const createPost = useCallback((content: string, requestedApprovals: Contact[] = []) => {
+  const createPost = useCallback((
+    content: string,
+    requestedApprovals: Contact[] = [],
+    imageUris: string[] = [],
+    videoUris: string[] = []
+  ) => {
     const newPost: Post = {
       id: Date.now().toString(),
       content,
@@ -53,6 +60,8 @@ export const usePostsStore = () => {
       updatedAt: new Date(),
       requestedApprovals,
       approvals: {},
+      imageUris,
+      videoUris,
     };
     const updated = [...posts, newPost];
     savePosts(updated);

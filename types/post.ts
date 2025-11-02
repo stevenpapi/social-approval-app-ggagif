@@ -21,4 +21,6 @@ export interface Post {
       feedback?: string;
     };
   };
+  imageUris?: string[];
+  videoUris?: string[];
 }
