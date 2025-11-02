@@ -1,79 +1,61 @@
-import React from "react";
-import { Stack, Link } from "expo-router";
-import { FlatList, Pressable, StyleSheet, View, Text, Alert, Platform } from "react-native";
-import { IconSymbol } from "@/components/IconSymbol";
-import { GlassView } from "expo-glass-effect";
-import { useTheme } from "@react-navigation/native";
 
-const ICON_COLOR = "#007AFF";
+import React from 'react';
+import { Stack, Link } from 'expo-router';
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  View,
+  Text,
+  Platform,
+  ScrollView,
+} from 'react-native';
+import { IconSymbol } from '@/components/IconSymbol';
+import { GlassView } from 'expo-glass-effect';
+import { useTheme } from '@react-navigation/native';
+import { colors } from '@/styles/commonStyles';
+import { usePostsStore } from '@/hooks/usePostsStore';
+import { PostCard } from '@/components/PostCard';
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const modalDemos = [
-    {
-      title: "Standard Modal",
-      description: "Full screen modal presentation",
-      route: "/modal",
-      color: "#007AFF",
-    },
-    {
-      title: "Form Sheet",
-      description: "Bottom sheet with detents and grabber",
-      route: "/formsheet",
-      color: "#34C759",
-    },
-    {
-      title: "Transparent Modal",
-      description: "Overlay without obscuring background",
-      route: "/transparent-modal",
-      color: "#FF9500",
-    }
-  ];
+  const { posts, deletePost, getPostsByStatus } = usePostsStore();
 
-  const renderModalDemo = ({ item }: { item: (typeof modalDemos)[0] }) => (
-    <GlassView style={[
-      styles.demoCard,
-      Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-    ]} glassEffectStyle="regular">
-      <View style={[styles.demoIcon, { backgroundColor: item.color }]}>
-        <IconSymbol name="square.grid.3x3" color="white" size={24} />
-      </View>
-      <View style={styles.demoContent}>
-        <Text style={[styles.demoTitle, { color: theme.colors.text }]}>{item.title}</Text>
-        <Text style={[styles.demoDescription, { color: theme.dark ? '#98989D' : '#666' }]}>{item.description}</Text>
-      </View>
-      <Link href={item.route as any} asChild>
-        <Pressable>
-          <GlassView style={[
-            styles.tryButton,
-            Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }
-          ]} glassEffectStyle="clear">
-            <Text style={[styles.tryButtonText, { color: theme.colors.primary }]}>Try It</Text>
-          </GlassView>
-        </Pressable>
-      </Link>
-    </GlassView>
-  );
+  const draftPosts = getPostsByStatus('draft');
+  const pendingPosts = getPostsByStatus('pending');
+  const approvedPosts = getPostsByStatus('approved');
 
   const renderHeaderRight = () => (
-    <Pressable
-      onPress={() => Alert.alert("Not Implemented", "This feature is not implemented yet")}
-      style={styles.headerButtonContainer}
-    >
-      <IconSymbol name="plus" color={theme.colors.primary} />
-    </Pressable>
+    <Link href="/createPost" asChild>
+      <Pressable style={styles.headerButtonContainer}>
+        <IconSymbol name="plus" color={colors.primary} size={24} />
+      </Pressable>
+    </Link>
   );
 
-  const renderHeaderLeft = () => (
-    <Pressable
-      onPress={() => Alert.alert("Not Implemented", "This feature is not implemented yet")}
-      style={styles.headerButtonContainer}
-    >
-      <IconSymbol
-        name="gear"
-        color={theme.colors.primary}
-      />
-    </Pressable>
+  const renderSection = (title: string, data: any[], emptyMessage: string) => (
+    <View style={styles.section}>
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{data.length}</Text>
+        </View>
+      </View>
+      {data.length === 0 ? (
+        <Text style={styles.emptyMessage}>{emptyMessage}</Text>
+      ) : (
+        <View>
+          {data.map(post => (
+            <PostCard
+              key={post.id}
+              post={post}
+              onDelete={() => deletePost(post.id)}
+              showApprovalStatus={true}
+            />
+          ))}
+        </View>
+      )}
+    </View>
   );
 
   return (
@@ -81,24 +63,50 @@ export default function HomeScreen() {
       {Platform.OS === 'ios' && (
         <Stack.Screen
           options={{
-            title: "Building the app...",
+            title: 'Social Post Approval',
             headerRight: renderHeaderRight,
-            headerLeft: renderHeaderLeft,
           }}
         />
       )}
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <FlatList
-          data={modalDemos}
-          renderItem={renderModalDemo}
-          keyExtractor={(item) => item.route}
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={[
             styles.listContainer,
-            Platform.OS !== 'ios' && styles.listContainerWithTabBar
+            Platform.OS !== 'ios' && styles.listContainerWithTabBar,
           ]}
-          contentInsetAdjustmentBehavior="automatic"
           showsVerticalScrollIndicator={false}
-        />
+        >
+          {/* Header for Android/Web */}
+          {Platform.OS !== 'ios' && (
+            <View style={styles.androidHeader}>
+              <Text style={styles.androidHeaderTitle}>Social Post Approval</Text>
+              <Link href="/createPost" asChild>
+                <Pressable>
+                  <IconSymbol name="plus" color={colors.primary} size={24} />
+                </Pressable>
+              </Link>
+            </View>
+          )}
+
+          {renderSection(
+            'Drafts',
+            draftPosts,
+            'No draft posts yet. Create one to get started!'
+          )}
+
+          {renderSection(
+            'Pending Approval',
+            pendingPosts,
+            'No posts awaiting approval'
+          )}
+
+          {renderSection(
+            'Approved Posts',
+            approvedPosts,
+            'No approved posts yet'
+          )}
+        </ScrollView>
       </View>
     </>
   );
@@ -107,55 +115,62 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    // backgroundColor handled dynamically
+  },
+  scrollView: {
+    flex: 1,
   },
   listContainer: {
     paddingVertical: 16,
     paddingHorizontal: 16,
   },
   listContainerWithTabBar: {
-    paddingBottom: 100, // Extra padding for floating tab bar
+    paddingBottom: 100,
   },
-  demoCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+  androidHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 24,
   },
-  demoIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  demoContent: {
-    flex: 1,
-  },
-  demoTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-    // color handled dynamically
-  },
-  demoDescription: {
-    fontSize: 14,
-    lineHeight: 18,
-    // color handled dynamically
+  androidHeaderTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.text,
   },
   headerButtonContainer: {
     padding: 6,
   },
-  tryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
+  section: {
+    marginBottom: 28,
   },
-  tryButtonText: {
-    fontSize: 14,
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  badge: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 28,
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: colors.card,
+    fontSize: 12,
     fontWeight: '600',
-    // color handled dynamically
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    paddingVertical: 12,
   },
 });

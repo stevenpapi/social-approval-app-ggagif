@@ -1,91 +1,291 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { IconSymbol } from "@/components/IconSymbol";
-import { GlassView } from "expo-glass-effect";
-import { useTheme } from "@react-navigation/native";
+
+import { IconSymbol } from '@/components/IconSymbol';
+import React from 'react';
+import { GlassView } from 'expo-glass-effect';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '@react-navigation/native';
+import { View, Text, StyleSheet, ScrollView, Platform, Pressable } from 'react-native';
+import { colors } from '@/styles/commonStyles';
+import { usePostsStore } from '@/hooks/usePostsStore';
+import { useContactsStore } from '@/hooks/useContactsStore';
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { posts } = usePostsStore();
+  const { contacts } = useContactsStore();
+
+  const stats = {
+    totalPosts: posts.length,
+    draftPosts: posts.filter(p => p.status === 'draft').length,
+    approvedPosts: posts.filter(p => p.status === 'approved').length,
+    pendingPosts: posts.filter(p => p.status === 'pending').length,
+    contacts: contacts.length,
+  };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.colors.background }]} edges={['top']}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={[
-          styles.contentContainer,
-          Platform.OS !== 'ios' && styles.contentContainerWithTabBar
-        ]}
-      >
-        <GlassView style={[
-          styles.profileHeader,
-          Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-        ]} glassEffectStyle="regular">
-          <IconSymbol name="person.circle.fill" size={80} color={theme.colors.primary} />
-          <Text style={[styles.name, { color: theme.colors.text }]}>John Doe</Text>
-          <Text style={[styles.email, { color: theme.dark ? '#98989D' : '#666' }]}>john.doe@example.com</Text>
-        </GlassView>
+    <>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.content,
+            Platform.OS !== 'ios' && styles.contentWithTabBar,
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header */}
+          {Platform.OS !== 'ios' && (
+            <Text style={styles.pageTitle}>Profile</Text>
+          )}
 
-        <GlassView style={[
-          styles.section,
-          Platform.OS !== 'ios' && { backgroundColor: theme.dark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)' }
-        ]} glassEffectStyle="regular">
-          <View style={styles.infoRow}>
-            <IconSymbol name="phone.fill" size={20} color={theme.dark ? '#98989D' : '#666'} />
-            <Text style={[styles.infoText, { color: theme.colors.text }]}>+1 (555) 123-4567</Text>
+          {/* User Card */}
+          <View style={styles.userCard}>
+            <View style={styles.avatar}>
+              <IconSymbol name="person.fill" color={colors.card} size={40} />
+            </View>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>You</Text>
+              <Text style={styles.userEmail}>social.approval@app.com</Text>
+            </View>
           </View>
-          <View style={styles.infoRow}>
-            <IconSymbol name="location.fill" size={20} color={theme.dark ? '#98989D' : '#666'} />
-            <Text style={[styles.infoText, { color: theme.colors.text }]}>San Francisco, CA</Text>
+
+          {/* Stats Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Your Activity</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.totalPosts}</Text>
+                <Text style={styles.statLabel}>Total Posts</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.draftPosts}</Text>
+                <Text style={styles.statLabel}>Drafts</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.approvedPosts}</Text>
+                <Text style={styles.statLabel}>Approved</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statValue}>{stats.pendingPosts}</Text>
+                <Text style={styles.statLabel}>Pending</Text>
+              </View>
+            </View>
           </View>
-        </GlassView>
-      </ScrollView>
-    </SafeAreaView>
+
+          {/* Contacts Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Contacts</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{stats.contacts}</Text>
+              </View>
+            </View>
+            <View style={styles.contactsList}>
+              {contacts.map((contact, index) => (
+                <View
+                  key={contact.id}
+                  style={[
+                    styles.contactItem,
+                    index !== contacts.length - 1 && styles.contactItemBorder,
+                  ]}
+                >
+                  <View style={styles.contactAvatar}>
+                    <Text style={styles.contactAvatarText}>
+                      {contact.name.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <View style={styles.contactInfo}>
+                    <Text style={styles.contactName}>{contact.name}</Text>
+                    {contact.email && (
+                      <Text style={styles.contactEmail}>{contact.email}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* About Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>About</Text>
+            <View style={styles.aboutCard}>
+              <Text style={styles.aboutText}>
+                Social Post Approval v1.0
+              </Text>
+              <Text style={styles.aboutSubtext}>
+                Request approval from your contacts before publishing social media posts
+              </Text>
+            </View>
+          </View>
+        </ScrollView>
+      </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    // backgroundColor handled dynamically
-  },
   container: {
     flex: 1,
   },
-  contentContainer: {
-    padding: 20,
+  scrollView: {
+    flex: 1,
   },
-  contentContainerWithTabBar: {
-    paddingBottom: 100, // Extra padding for floating tab bar
+  content: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
   },
-  profileHeader: {
-    alignItems: 'center',
-    borderRadius: 12,
-    padding: 32,
-    marginBottom: 16,
-    gap: 12,
+  contentWithTabBar: {
+    paddingBottom: 100,
   },
-  name: {
+  pageTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    // color handled dynamically
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: 20,
   },
-  email: {
-    fontSize: 16,
-    // color handled dynamically
-  },
-  section: {
+  userCard: {
+    backgroundColor: colors.card,
     borderRadius: 12,
-    padding: 20,
-    gap: 12,
-  },
-  infoRow: {
+    padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 24,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  avatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  userEmail: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  badge: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    minWidth: 28,
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: colors.card,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 12,
   },
-  infoText: {
-    fontSize: 16,
-    // color handled dynamically
+  statCard: {
+    flex: 1,
+    minWidth: '48%',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
+  contactsList: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    overflow: 'hidden',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  contactItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.background,
+  },
+  contactAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.highlight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  contactAvatarText: {
+    color: colors.card,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  contactEmail: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  aboutCard: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  aboutText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  aboutSubtext: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 8,
+    lineHeight: 20,
   },
 });
