@@ -36,11 +36,12 @@ export const useContactsStore = () => {
     }
   }, []);
 
-  const addContact = useCallback((name: string, email?: string) => {
+  const addContact = useCallback((name: string, email?: string, phoneNumber?: string) => {
     const newContact: Contact = {
       id: Date.now().toString(),
       name,
       email,
+      phoneNumber,
     };
     const updated = [...contacts, newContact];
     AsyncStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify(updated));
