@@ -1,5 +1,7 @@
 
-export type PostStatus = 'draft' | 'pending' | 'approved' | 'rejected';
+export type PostStatus = 'DRAFT' | 'PENDING' | 'APPROVED' | 'REJECTED';
+export type Platform = 'instagram' | 'facebook' | 'tiktok' | 'x' | 'linkedin';
+export type AuditAction = 'CREATE' | 'SUBMIT' | 'APPROVE' | 'REJECT' | 'EDIT';
 
 export interface Contact {
   id: string;
@@ -8,20 +10,24 @@ export interface Contact {
   phoneNumber?: string;
 }
 
+export interface AuditEntry {
+  at: string; // ISO timestamp
+  actor: string;
+  action: AuditAction;
+  note?: string;
+}
+
 export interface Post {
   id: string;
-  content: string;
+  title: string;
+  caption: string;
+  mediaUris: string[]; // local or remote URIs
+  platforms: Platform[];
+  scheduledAt?: string; // ISO timestamp
   status: PostStatus;
-  createdAt: Date;
-  updatedAt: Date;
-  requestedApprovals: Contact[];
-  approvals: {
-    [contactId: string]: {
-      status: 'approved' | 'rejected' | 'pending';
-      respondedAt?: Date;
-      feedback?: string;
-    };
-  };
-  imageUris?: string[];
-  videoUris?: string[];
+  rejectionReason?: string;
+  createdBy: string;
+  createdAt: string; // ISO timestamp
+  updatedAt: string; // ISO timestamp
+  audit: AuditEntry[];
 }

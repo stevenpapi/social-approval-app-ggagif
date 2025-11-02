@@ -1,25 +1,55 @@
 
 import { IconSymbol } from '@/components/IconSymbol';
-import React from 'react';
-import { GlassView } from 'expo-glass-effect';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { usePostsContext } from '@/contexts/PostsContext';
+import React, { useState } from 'react';
 import { useTheme } from '@react-navigation/native';
-import { View, Text, StyleSheet, ScrollView, Platform, Pressable } from 'react-native';
-import { colors } from '@/styles/commonStyles';
-import { usePostsStore } from '@/hooks/usePostsStore';
 import { useContactsStore } from '@/hooks/useContactsStore';
+import { GlassView } from 'expo-glass-effect';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Platform,
+  Pressable,
+  Alert,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors } from '@/styles/commonStyles';
+import { Toast } from '@/components/Toast';
+import { useToast } from '@/hooks/useToast';
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { posts } = usePostsStore();
+  const { resetDatabase, counts } = usePostsContext();
   const { contacts } = useContactsStore();
+  const { toast, success, error, hide } = useToast();
+  const [isResetting, setIsResetting] = useState(false);
 
-  const stats = {
-    totalPosts: posts.length,
-    draftPosts: posts.filter(p => p.status === 'draft').length,
-    approvedPosts: posts.filter(p => p.status === 'approved').length,
-    pendingPosts: posts.filter(p => p.status === 'pending').length,
-    contacts: contacts.length,
+  const handleResetDatabase = () => {
+    Alert.alert(
+      'Reset Database',
+      'This will delete all posts and restore seed data. Are you sure?',
+      [
+        { text: 'Cancel', onPress: () => console.log('Cancel pressed'), style: 'cancel' },
+        {
+          text: 'Reset',
+          onPress: async () => {
+            try {
+              setIsResetting(true);
+              await resetDatabase();
+              success('Database reset successfully!');
+            } catch (err) {
+              console.log('Error resetting database:', err);
+              error('Failed to reset database');
+            } finally {
+              setIsResetting(false);
+            }
+          },
+          style: 'destructive',
+        },
+      ]
+    );
   };
 
   return (
@@ -28,97 +58,103 @@ export default function ProfileScreen() {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={[
-            styles.content,
-            Platform.OS !== 'ios' && styles.contentWithTabBar,
+            styles.listContainer,
+            Platform.OS !== 'ios' && styles.listContainerWithTabBar,
           ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Header */}
           {Platform.OS !== 'ios' && (
-            <Text style={styles.pageTitle}>Profile</Text>
+            <View style={styles.androidHeader}>
+              <Text style={styles.androidHeaderTitle}>Profile</Text>
+            </View>
           )}
 
-          {/* User Card */}
-          <View style={styles.userCard}>
-            <View style={styles.avatar}>
-              <IconSymbol name="person.fill" color={colors.card} size={40} />
-            </View>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>You</Text>
-              <Text style={styles.userEmail}>social.approval@app.com</Text>
-            </View>
-          </View>
-
-          {/* Stats Section */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Your Activity</Text>
+            <Text style={styles.sectionTitle}>Statistics</Text>
             <View style={styles.statsGrid}>
               <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.totalPosts}</Text>
-                <Text style={styles.statLabel}>Total Posts</Text>
-              </View>
-              <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.draftPosts}</Text>
+                <Text style={styles.statNumber}>{counts.DRAFT}</Text>
                 <Text style={styles.statLabel}>Drafts</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.approvedPosts}</Text>
+                <Text style={styles.statNumber}>{counts.PENDING}</Text>
+                <Text style={styles.statLabel}>Pending</Text>
+              </View>
+              <View style={styles.statCard}>
+                <Text style={styles.statNumber}>{counts.APPROVED}</Text>
                 <Text style={styles.statLabel}>Approved</Text>
               </View>
               <View style={styles.statCard}>
-                <Text style={styles.statValue}>{stats.pendingPosts}</Text>
-                <Text style={styles.statLabel}>Pending</Text>
+                <Text style={styles.statNumber}>{counts.REJECTED}</Text>
+                <Text style={styles.statLabel}>Rejected</Text>
               </View>
             </View>
           </View>
 
-          {/* Contacts Section */}
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Contacts</Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{stats.contacts}</Text>
+            <Text style={styles.sectionTitle}>Contacts ({contacts.length})</Text>
+            {contacts.length === 0 ? (
+              <Text style={styles.emptyText}>No contacts added yet</Text>
+            ) : (
+              <View>
+                {contacts.map(contact => (
+                  <View key={contact.id} style={styles.contactItem}>
+                    <View style={styles.contactAvatar}>
+                      <Text style={styles.contactAvatarText}>
+                        {contact.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.contactInfo}>
+                      <Text style={styles.contactName}>{contact.name}</Text>
+                      {contact.email && (
+                        <Text style={styles.contactEmail}>{contact.email}</Text>
+                      )}
+                      {contact.phoneNumber && (
+                        <Text style={styles.contactPhone}>{contact.phoneNumber}</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
               </View>
-            </View>
-            <View style={styles.contactsList}>
-              {contacts.map((contact, index) => (
-                <View
-                  key={contact.id}
-                  style={[
-                    styles.contactItem,
-                    index !== contacts.length - 1 && styles.contactItemBorder,
-                  ]}
-                >
-                  <View style={styles.contactAvatar}>
-                    <Text style={styles.contactAvatarText}>
-                      {contact.name.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.contactInfo}>
-                    <Text style={styles.contactName}>{contact.name}</Text>
-                    {contact.email && (
-                      <Text style={styles.contactEmail}>{contact.email}</Text>
-                    )}
-                  </View>
-                </View>
-              ))}
-            </View>
+            )}
           </View>
 
-          {/* About Section */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Database</Text>
+            <Pressable
+              onPress={handleResetDatabase}
+              disabled={isResetting}
+              style={[styles.resetButton, isResetting && styles.buttonDisabled]}
+            >
+              <IconSymbol name="arrow.clockwise" color={colors.card} size={18} />
+              <Text style={styles.resetButtonText}>
+                {isResetting ? 'Resetting...' : 'Reset Database'}
+              </Text>
+            </Pressable>
+            <Text style={styles.resetDescription}>
+              This will delete all posts and restore seed data for testing.
+            </Text>
+          </View>
+
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>About</Text>
-            <View style={styles.aboutCard}>
-              <Text style={styles.aboutText}>
-                Social Post Approval v1.0
-              </Text>
-              <Text style={styles.aboutSubtext}>
-                Request approval from your contacts before publishing social media posts
-              </Text>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoLabel}>App Version</Text>
+              <Text style={styles.infoValue}>1.0.0</Text>
+            </View>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoLabel}>Platform</Text>
+              <Text style={styles.infoValue}>{Platform.OS === 'ios' ? 'iOS' : 'Android'}</Text>
             </View>
           </View>
         </ScrollView>
       </View>
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        visible={toast.visible}
+        onHide={hide}
+      />
     </>
   );
 }
@@ -130,77 +166,29 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  content: {
-    paddingHorizontal: 16,
+  listContainer: {
     paddingVertical: 16,
+    paddingHorizontal: 16,
   },
-  contentWithTabBar: {
+  listContainerWithTabBar: {
     paddingBottom: 100,
   },
-  pageTitle: {
+  androidHeader: {
+    marginBottom: 24,
+  },
+  androidHeaderTitle: {
     fontSize: 24,
     fontWeight: '700',
     color: colors.text,
-    marginBottom: 20,
   },
-  userCard: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 24,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+  section: {
+    marginBottom: 28,
   },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: colors.text,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 4,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  badge: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 28,
-    alignItems: 'center',
-  },
-  badgeText: {
-    color: colors.card,
-    fontSize: 12,
-    fontWeight: '600',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -209,7 +197,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    minWidth: '48%',
+    minWidth: '45%',
     backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
@@ -217,44 +205,39 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
-  statValue: {
-    fontSize: 24,
+  statNumber: {
+    fontSize: 28,
     fontWeight: '700',
     color: colors.primary,
+    marginBottom: 4,
   },
   statLabel: {
     fontSize: 12,
+    fontWeight: '600',
     color: colors.textSecondary,
-    marginTop: 4,
-  },
-  contactsList: {
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
   },
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: colors.card,
+    borderRadius: 12,
     padding: 12,
-  },
-  contactItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background,
+    marginBottom: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
   },
   contactAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   contactAvatarText: {
     color: colors.card,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
   },
   contactInfo: {
@@ -270,22 +253,59 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
   },
-  aboutCard: {
+  contactPhone: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    paddingVertical: 12,
+  },
+  resetButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+    marginBottom: 8,
+  },
+  resetButtonText: {
+    color: colors.card,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resetDescription: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+  },
+  infoCard: {
     backgroundColor: colors.card,
     borderRadius: 12,
-    padding: 16,
+    padding: 12,
+    marginBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
-  aboutText: {
+  infoLabel: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
   },
-  aboutSubtext: {
-    fontSize: 13,
+  infoValue: {
+    fontSize: 14,
     color: colors.textSecondary,
-    marginTop: 8,
-    lineHeight: 20,
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });

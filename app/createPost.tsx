@@ -15,20 +15,27 @@ import { Stack, router } from 'expo-router';
 import { useTheme } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { colors } from '@/styles/commonStyles';
-import { usePostsStore } from '@/hooks/usePostsStore';
+import { usePostsContext } from '@/contexts/PostsContext';
 import { useContactsStore } from '@/hooks/useContactsStore';
 import { Contact } from '@/types/post';
 import { IconSymbol } from '@/components/IconSymbol';
+import { Toast } from '@/components/Toast';
+import { useToast } from '@/hooks/useToast';
 
 export default function CreatePostScreen() {
   const theme = useTheme();
-  const { createPost, submitForApproval } = usePostsStore();
+  const { createDraft, submitForApproval } = usePostsContext();
   const { contacts } = useContactsStore();
-  const [content, setContent] = useState('');
-  const [selectedContacts, setSelectedContacts] = useState<Contact[]>([]);
-  const [showContactList, setShowContactList] = useState(false);
+  const { toast, success, error, hide } = useToast();
+
+  const [title, setTitle] = useState('');
+  const [caption, setCaption] = useState('');
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [imageUris, setImageUris] = useState<string[]>([]);
   const [videoUris, setVideoUris] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const platforms = ['instagram', 'facebook', 'tiktok', 'x', 'linkedin'];
 
   const handlePickImage = async () => {
     try {
@@ -42,9 +49,9 @@ export default function CreatePostScreen() {
         const newUris = result.assets.map(asset => asset.uri);
         setImageUris([...imageUris, ...newUris]);
       }
-    } catch (error) {
-      console.log('Error picking image:', error);
-      alert('Failed to pick image');
+    } catch (err) {
+      console.log('Error picking image:', err);
+      error('Failed to pick image');
     }
   };
 
@@ -60,9 +67,9 @@ export default function CreatePostScreen() {
         const newUris = result.assets.map(asset => asset.uri);
         setVideoUris([...videoUris, ...newUris]);
       }
-    } catch (error) {
-      console.log('Error picking video:', error);
-      alert('Failed to pick video');
+    } catch (err) {
+      console.log('Error picking video:', err);
+      error('Failed to pick video');
     }
   };
 
@@ -74,63 +81,57 @@ export default function CreatePostScreen() {
     setVideoUris(videoUris.filter((_, i) => i !== index));
   };
 
-  const handleToggleContact = (contact: Contact) => {
-    const isSelected = selectedContacts.some(c => c.id === contact.id);
-    if (isSelected) {
-      setSelectedContacts(selectedContacts.filter(c => c.id !== contact.id));
+  const handleTogglePlatform = (platform: string) => {
+    if (selectedPlatforms.includes(platform)) {
+      setSelectedPlatforms(selectedPlatforms.filter(p => p !== platform));
     } else {
-      setSelectedContacts([...selectedContacts, contact]);
+      setSelectedPlatforms([...selectedPlatforms, platform]);
     }
   };
 
-  const handleSaveDraft = () => {
-    if (!content.trim() && imageUris.length === 0 && videoUris.length === 0) {
-      alert('Please add content, images, or videos to your post');
+  const handleSaveDraft = async () => {
+    if (!title.trim() && !caption.trim() && imageUris.length === 0 && videoUris.length === 0) {
+      error('Please add title, caption, or media to your post');
       return;
     }
-    createPost(content, [], imageUris, videoUris);
-    alert('Post saved as draft!');
-    router.back();
+
+    try {
+      setIsLoading(true);
+      const mediaUris = [...imageUris, ...videoUris];
+      await createDraft(title, caption, mediaUris, selectedPlatforms);
+      success('Post saved as draft!');
+      setTimeout(() => {
+        router.back();
+      }, 500);
+    } catch (err) {
+      console.log('Error saving draft:', err);
+      error('Failed to save draft');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleSubmitForApproval = () => {
-    if (!content.trim() && imageUris.length === 0 && videoUris.length === 0) {
-      alert('Please add content, images, or videos to your post');
+  const handleSubmitForApproval = async () => {
+    if (!title.trim() && !caption.trim() && imageUris.length === 0 && videoUris.length === 0) {
+      error('Please add title, caption, or media to your post');
       return;
     }
-    if (selectedContacts.length === 0) {
-      alert('Please select at least one contact to request approval from');
-      return;
-    }
-    const post = createPost(content, selectedContacts, imageUris, videoUris);
-    submitForApproval(post.id, selectedContacts);
-    alert('Post submitted for approval!');
-    router.back();
-  };
 
-  const renderContactItem = ({ item }: { item: Contact }) => {
-    const isSelected = selectedContacts.some(c => c.id === item.id);
-    return (
-      <Pressable
-        onPress={() => handleToggleContact(item)}
-        style={[
-          styles.contactItem,
-          isSelected && styles.contactItemSelected,
-        ]}
-      >
-        <View style={styles.contactCheckbox}>
-          {isSelected && (
-            <IconSymbol name="checkmark" color={colors.primary} size={16} />
-          )}
-        </View>
-        <View style={styles.contactInfo}>
-          <Text style={styles.contactName}>{item.name}</Text>
-          {item.email && (
-            <Text style={styles.contactEmail}>{item.email}</Text>
-          )}
-        </View>
-      </Pressable>
-    );
+    try {
+      setIsLoading(true);
+      const mediaUris = [...imageUris, ...videoUris];
+      const post = await createDraft(title, caption, mediaUris, selectedPlatforms);
+      await submitForApproval(post.id);
+      success('Post submitted for approval!');
+      setTimeout(() => {
+        router.back();
+      }, 500);
+    } catch (err) {
+      console.log('Error submitting for approval:', err);
+      error('Failed to submit for approval');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -152,20 +153,59 @@ export default function CreatePostScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.section}>
-            <Text style={styles.label}>Post Content</Text>
+            <Text style={styles.label}>Post Title</Text>
+            <TextInput
+              style={[styles.input, { color: colors.text }]}
+              placeholder="Enter post title"
+              placeholderTextColor={colors.textSecondary}
+              value={title}
+              onChangeText={setTitle}
+              editable={!isLoading}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Caption</Text>
             <TextInput
               style={[styles.input, { color: colors.text }]}
               placeholder="What's on your mind?"
               placeholderTextColor={colors.textSecondary}
               multiline
               numberOfLines={6}
-              value={content}
-              onChangeText={setContent}
+              value={caption}
+              onChangeText={setCaption}
               textAlignVertical="top"
+              editable={!isLoading}
             />
             <Text style={styles.charCount}>
-              {content.length} characters
+              {caption.length} characters
             </Text>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Platforms</Text>
+            <View style={styles.platformsContainer}>
+              {platforms.map(platform => (
+                <Pressable
+                  key={platform}
+                  onPress={() => handleTogglePlatform(platform)}
+                  disabled={isLoading}
+                  style={[
+                    styles.platformBadge,
+                    selectedPlatforms.includes(platform) && styles.platformBadgeSelected,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.platformText,
+                      selectedPlatforms.includes(platform) && styles.platformTextSelected,
+                    ]}
+                  >
+                    {platform}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
 
           <View style={styles.section}>
@@ -173,14 +213,16 @@ export default function CreatePostScreen() {
             <View style={styles.mediaButtonContainer}>
               <Pressable
                 onPress={handlePickImage}
-                style={[styles.mediaButton, styles.imageButton]}
+                disabled={isLoading}
+                style={[styles.mediaButton, styles.imageButton, isLoading && styles.buttonDisabled]}
               >
                 <IconSymbol name="photo" color={colors.card} size={20} />
                 <Text style={styles.mediaButtonText}>Add Images</Text>
               </Pressable>
               <Pressable
                 onPress={handlePickVideo}
-                style={[styles.mediaButton, styles.videoButton]}
+                disabled={isLoading}
+                style={[styles.mediaButton, styles.videoButton, isLoading && styles.buttonDisabled]}
               >
                 <IconSymbol name="play.circle" color={colors.card} size={20} />
                 <Text style={styles.mediaButtonText}>Add Videos</Text>
@@ -200,6 +242,7 @@ export default function CreatePostScreen() {
                       />
                       <Pressable
                         onPress={() => handleRemoveImage(index)}
+                        disabled={isLoading}
                         style={styles.removeButton}
                       >
                         <IconSymbol name="xmark.circle.fill" color={colors.accent} size={24} />
@@ -226,6 +269,7 @@ export default function CreatePostScreen() {
                       </View>
                       <Pressable
                         onPress={() => handleRemoveVideo(index)}
+                        disabled={isLoading}
                         style={styles.removeButton}
                       >
                         <IconSymbol name="xmark.circle.fill" color={colors.accent} size={24} />
@@ -241,54 +285,34 @@ export default function CreatePostScreen() {
             )}
           </View>
 
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.label}>Request Approval From</Text>
-              <Text style={styles.selectedCount}>
-                {selectedContacts.length} selected
-              </Text>
-            </View>
-            <Pressable
-              onPress={() => setShowContactList(!showContactList)}
-              style={styles.contactListToggle}
-            >
-              <Text style={styles.contactListToggleText}>
-                {showContactList ? 'Hide Contacts' : 'Show Contacts'}
-              </Text>
-              <IconSymbol
-                name={showContactList ? 'chevron.up' : 'chevron.down'}
-                color={colors.primary}
-                size={20}
-              />
-            </Pressable>
-
-            {showContactList && (
-              <FlatList
-                data={contacts}
-                renderItem={renderContactItem}
-                keyExtractor={item => item.id}
-                scrollEnabled={false}
-                style={styles.contactList}
-              />
-            )}
-          </View>
-
           <View style={styles.buttonContainer}>
             <Pressable
               onPress={handleSaveDraft}
-              style={[styles.button, styles.secondaryButton]}
+              disabled={isLoading}
+              style={[styles.button, styles.secondaryButton, isLoading && styles.buttonDisabled]}
             >
-              <Text style={styles.secondaryButtonText}>Save as Draft</Text>
+              <Text style={styles.secondaryButtonText}>
+                {isLoading ? 'Saving...' : 'Save as Draft'}
+              </Text>
             </Pressable>
             <Pressable
               onPress={handleSubmitForApproval}
-              style={[styles.button, styles.primaryButton]}
+              disabled={isLoading}
+              style={[styles.button, styles.primaryButton, isLoading && styles.buttonDisabled]}
             >
-              <Text style={styles.primaryButtonText}>Submit for Approval</Text>
+              <Text style={styles.primaryButtonText}>
+                {isLoading ? 'Submitting...' : 'Submit for Approval'}
+              </Text>
             </Pressable>
           </View>
         </ScrollView>
       </View>
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        visible={toast.visible}
+        onHide={hide}
+      />
     </>
   );
 }
@@ -307,21 +331,11 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 24,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
   label: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 12,
-  },
-  selectedCount: {
-    fontSize: 14,
-    color: colors.textSecondary,
   },
   input: {
     backgroundColor: colors.card,
@@ -330,13 +344,37 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: colors.background,
-    minHeight: 120,
+    minHeight: 44,
   },
   charCount: {
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 8,
     textAlign: 'right',
+  },
+  platformsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  platformBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  platformBadgeSelected: {
+    backgroundColor: colors.primary,
+  },
+  platformText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  platformTextSelected: {
+    color: colors.card,
   },
   mediaButtonContainer: {
     flexDirection: 'row',
@@ -403,64 +441,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderRadius: 12,
   },
-  contactListToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.background,
-  },
-  contactListToggleText: {
-    fontSize: 14,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  contactList: {
-    marginTop: 12,
-    backgroundColor: colors.card,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.background,
-    overflow: 'hidden',
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background,
-  },
-  contactItemSelected: {
-    backgroundColor: colors.highlight + '20',
-  },
-  contactCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  contactInfo: {
-    flex: 1,
-  },
-  contactName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  contactEmail: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 2,
-  },
   buttonContainer: {
     gap: 12,
     marginTop: 24,
@@ -489,6 +469,9 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   headerButton: {
     padding: 8,

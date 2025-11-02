@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Stack, Link } from 'expo-router';
 import {
   FlatList,
@@ -9,21 +9,48 @@ import {
   Text,
   Platform,
   ScrollView,
+  RefreshControl,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
-import { GlassView } from 'expo-glass-effect';
 import { useTheme } from '@react-navigation/native';
 import { colors } from '@/styles/commonStyles';
-import { usePostsStore } from '@/hooks/usePostsStore';
+import { usePostsContext } from '@/contexts/PostsContext';
 import { PostCard } from '@/components/PostCard';
+import { Toast } from '@/components/Toast';
+import { useToast } from '@/hooks/useToast';
 
 export default function HomeScreen() {
   const theme = useTheme();
-  const { posts, deletePost, getPostsByStatus } = usePostsStore();
+  const { posts, counts, refreshPosts, deletePost, getByStatus } = usePostsContext();
+  const { toast, success, error, hide } = useToast();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const draftPosts = getPostsByStatus('draft');
-  const pendingPosts = getPostsByStatus('pending');
-  const approvedPosts = getPostsByStatus('approved');
+  const draftPosts = getByStatus('DRAFT');
+  const pendingPosts = getByStatus('PENDING');
+  const approvedPosts = getByStatus('APPROVED');
+  const rejectedPosts = getByStatus('REJECTED');
+
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await refreshPosts();
+    } catch (err) {
+      console.log('Error refreshing:', err);
+      error('Failed to refresh');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await deletePost(postId);
+      success('Post deleted');
+    } catch (err) {
+      console.log('Error deleting post:', err);
+      error('Failed to delete post');
+    }
+  };
 
   const renderHeaderRight = () => (
     <Link href="/createPost" asChild>
@@ -33,7 +60,7 @@ export default function HomeScreen() {
     </Link>
   );
 
-  const renderSection = (title: string, data: any[], emptyMessage: string) => (
+  const renderSection = (title: string, data: any[], emptyMessage: string, status: string) => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
@@ -49,8 +76,7 @@ export default function HomeScreen() {
             <PostCard
               key={post.id}
               post={post}
-              onDelete={() => deletePost(post.id)}
-              showApprovalStatus={true}
+              onDelete={() => handleDeletePost(post.id)}
             />
           ))}
         </View>
@@ -76,6 +102,13 @@ export default function HomeScreen() {
             Platform.OS !== 'ios' && styles.listContainerWithTabBar,
           ]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+            />
+          }
         >
           {/* Header for Android/Web */}
           {Platform.OS !== 'ios' && (
@@ -92,22 +125,38 @@ export default function HomeScreen() {
           {renderSection(
             'Drafts',
             draftPosts,
-            'No draft posts yet. Create one to get started!'
+            'No draft posts yet. Create one to get started!',
+            'DRAFT'
           )}
 
           {renderSection(
             'Pending Approval',
             pendingPosts,
-            'No posts awaiting approval'
+            'No posts awaiting approval',
+            'PENDING'
           )}
 
           {renderSection(
             'Approved Posts',
             approvedPosts,
-            'No approved posts yet'
+            'No approved posts yet',
+            'APPROVED'
+          )}
+
+          {renderSection(
+            'Rejected Posts',
+            rejectedPosts,
+            'No rejected posts',
+            'REJECTED'
           )}
         </ScrollView>
       </View>
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        visible={toast.visible}
+        onHide={hide}
+      />
     </>
   );
 }
